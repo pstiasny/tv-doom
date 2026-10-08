@@ -79,6 +79,8 @@ The mixer calibration curve in `components/video/rfcal_default.h`
 was measured on a real board with a TinySA and a Pluto+ SDR and might need
 to be retuned.
 
+Browse in [KiCanvas](https://kicanvas.org/?repo=https%3A%2F%2Fgithub.com%2Fpstiasny%2Ftv-doom%2Ftree%2Fmain%2Fhardware).
+
 
 ## License
 
