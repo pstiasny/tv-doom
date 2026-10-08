@@ -1,0 +1,21 @@
+# OTA layout (2026-09-14). CHANGING TO THIS TABLE NEEDS ONE FULL USB FLASH
+# (bootloader + table + factory loader + game app + WAD at its NEW offset).
+# After that, updates go over WiFi and USB is only a fallback.
+#
+# "factory" is the OTA LOADER (ota_loader/): a minimal WiFi-AP + HTTP app
+# with no video/PSRAM/BT -- flash writes happen with nothing running that
+# they could glitch. The game (ota_0) enters it via the pad combo
+# (esp_ota_set_boot_partition(factory) + reboot); the loader writes a new
+# game image into ota_0 and boots it. Rollback: a game image that dies
+# before validating falls back to the loader -- always re-pushable, never
+# bricked. The WAD moved from 0x210000; restore from wads/ (code finds it
+# by label, not offset).
+# Name,   Type, SubType, Offset,   Size
+nvs,      data, nvs,     0x9000,   0x6000
+phy_init, data, phy,     0xf000,   0x1000
+factory,  app,  factory, 0x20000,  0x180000
+otadata,  data, ota,     0x1A0000, 0x2000
+ota_0,    app,  ota_0,   0x1B0000, 0x180000
+# wad fills the rest of the chip: 13.4 MB -- doom.wad (12.4 MB) fits,
+# doom2.wad (14.6 MB) no longer does with the OTA slots in place.
+wad,      data, 0x40,    0x330000, 0xCD0000

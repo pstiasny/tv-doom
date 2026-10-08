@@ -1,0 +1,93 @@
+# ---- Target ----
+CONFIG_IDF_TARGET="esp32s3"
+
+# ---- Octal PSRAM (ESP32-S3R8) ----
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+# Route malloc()/heap_caps(MALLOC_CAP_SPIRAM) into external RAM so the Doom
+# zone, framebuffer and relocated renderer arrays land in PSRAM.
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
+
+# ---- Flash ----
+# The module's flash chip is 16MB (esptool flash-id: device 0x4018), even
+# though the board sells as S3R8 — use all of it (wad partition ~13.9MB,
+# enough for DOOM.WAD / DOOM2.WAD, not just the cut shareware).
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# ---- Partition table ----
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# ---- Performance ----
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# Encode is PSRAM-bandwidth-bound and shares the dcache with the LCD DMA's
+# 17.7 MB/s framebuffer stream. A bigger dcache with longer lines cuts the
+# thrash and halves allocate-fetches on the encode's sequential writes.
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+# ---- Composite video engine (RGB-LCD) ----
+# Keep the vsync ISR (and driver hot path) in IRAM so a flash/cache-disable
+# window can't stall it. RESTART_IN_VSYNC must stay OFF: on tv-plug it caused a
+# per-field 0V dropout (see the video/WiFi coexistence notes).
+CONFIG_LCD_RGB_ISR_IRAM_SAFE=y
+CONFIG_LCD_RGB_RESTART_IN_VSYNC=n
+
+# ---- Bring-up: keep the tight game-loop task from tripping the WDT ----
+CONFIG_ESP_TASK_WDT_INIT=n
+
+# ---- Bluetooth: Xbox controller over BLE HID (NimBLE host) ----
+# NimBLE over Bluedroid for its far smaller internal-RAM footprint (DRAM is
+# tight next to the video engine). Whole BT stack pinned to core 0 with Doom:
+# with a pad connected, BT on core 1 preempted the video encoder enough for
+# visible engine-late frame repeats; Doom has 10-24 ms/frame of idle
+# backpressure wait at the 26 fps pace, which absorbs BT without fps cost.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+CONFIG_BT_NIMBLE_HID_SERVICE=y
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=2
+# Peripheral role must stay on: BT_NIMBLE_HID_SERVICE (which also gates the
+# HID *host* code in esp_hid/nimble_hidh.c) sits behind GATT_SERVER, which
+# depends on ROLE_PERIPHERAL. Upstream Kconfig quirk.
+CONFIG_BT_NIMBLE_PINNED_TO_CORE_0=y
+CONFIG_BT_CTRL_PINNED_TO_CORE_0=y
+# Internal DRAM is nearly exhausted (~80 KB free at boot, controller takes
+# most of it): host pools go to PSRAM, and the controller keeps only a few
+# concurrent activities (the pad, a BLE log client, and scanning).
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+CONFIG_BT_CTRL_BLE_MAX_ACT=6
+# REQUIRED with this IDF (v6.1-dev): STATIC_TO_DYNAMIC (default y) moves
+# g_eventq_dflt into a ctx that only nimble_port_init() allocates; the
+# esp_hid_host init flow calls esp_nimble_init() directly and NULL-crashes
+# in ble_npl_eventq_init. Off = classic static globals, works.
+CONFIG_BT_NIMBLE_STATIC_TO_DYNAMIC=n
+
+# No console. The default UART0 console sits on GPIO43/44, which on this board
+# are DAC_D0 (video R-2R LSB) and MIXER_SHUTDOWN (Q4 gate) -- every log line
+# would toggle the video DAC's least significant bit -- and USB is unreliable
+# on the assembled unit. Logs go over BLE instead (components/gamepad/blelog.c).
+CONFIG_ESP_CONSOLE_NONE=y
+# Same for the bootloader: its UART0 output would land on the DAC pins.
+CONFIG_LOG_BOOTLOADER_LEVEL_NONE=y
+
+# ---- OTA rollback ----
+# A game image that dies before ota_mark_healthy() falls back to the loader
+# in the factory slot (main/ota.h).
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_APP_ROLLBACK_ENABLE=y
+
+# ---- Settings that previously lived only in the generated sdkconfig ----
+CONFIG_FREERTOS_ISR_STACKSIZE=2096
+CONFIG_ESP_PANIC_HANDLER_IRAM=y
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+# PHY calibration data and WiFi config are not persisted to NVS.
+CONFIG_ESP_PHY_CALIBRATION_AND_DATA_STORAGE=n
+CONFIG_ESP_WIFI_NVS_ENABLED=n
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y

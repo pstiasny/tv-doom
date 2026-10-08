@@ -1,0 +1,20 @@
+# ESP-IDF build output and generated config (sdkconfig.defaults is the source)
+build/
+sdkconfig
+sdkconfig.old
+.cache/
+
+# Python
+.venv/
+__pycache__/
+
+# IWADs are copyrighted: put doom.wad here, it stays out of git
+wads/
+
+# KiCad per-user state and autosaves
+hardware/*.kicad_prl
+hardware/*-backups/
+hardware/fp-info-cache
+hardware/*.lck
+
+.DS_Store
